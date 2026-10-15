@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TSQ STORE</title>
+<style>
+:root{--bg:#f6f4ef;--card:#fff;--ink:#1d2a24;--mut:#6b7770;--g:#1f6f4a;--r:#b3402a;--line:#e3ded2}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,sans-serif}
+header{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--g);color:#fff}
+header b{font-size:19px;letter-spacing:.5px}header button{background:none;border:1px solid #fff9;color:#fff;border-radius:8px;padding:4px 10px}
+nav{display:flex;position:sticky;top:0;background:var(--bg);border-bottom:1px solid var(--line)}
+nav button{flex:1;padding:12px 4px;border:0;background:none;font:inherit;color:var(--mut);border-bottom:3px solid transparent}
+nav button.on{color:var(--g);border-color:var(--g);font-weight:700}
+main{padding:12px;max-width:720px;margin:auto}
+.c{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
+input,select{width:100%;padding:10px;margin:4px 0;border:1px solid var(--line);border-radius:8px;font:inherit;background:#fff}
+button.p{background:var(--g);color:#fff;border:0;border-radius:8px;padding:10px 16px;font:inherit;width:100%;margin-top:6px}
+button.s{background:none;border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:inherit}
+button.d,.d{color:var(--r)}
+.row{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.day{display:flex;justify-content:space-between;font-weight:700;margin:14px 2px 6px}
+.mut{color:var(--mut);font-size:14px}.big{font-size:22px;font-weight:700}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}.chips:not(:empty){margin:4px 0}
+img.t{width:56px;height:56px;object-fit:cover;border-radius:8px;background:#e9e6de;flex:none}
+.b{padding:2px 8px;border-radius:99px;font-size:13px}.pe{background:#fbe9c8;color:#7a4b00}.gi{background:#d5efdf;color:var(--g)}
+.tag{display:inline-block;margin:4px 6px 0 0;padding:2px 8px;border-radius:99px;background:#d5efdf;color:var(--g);font-size:14px}
+.tag i{font-style:normal;padding:0 4px;cursor:pointer}
+.tw{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:14px}td,th{padding:6px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}td:first-child,th:first-child{text-align:left}
+.lg{max-width:360px;margin:15vh auto;text-align:center}
+</style></head><body>
+<div id="app"></div>
+<script>
+const $=s=>document.querySelector(s),today=()=>new Date().toISOString().slice(0,10);
+let PW='',role='',tab='',S={items:[],orders:[],purchases:[]},photo='',vf='pending',op={},gk=[],HL={},eIt=null,eN=null,eP=null,cl={},pdate=today();
+const PWS={admin:'8943278664',vendor:'8664'}; /* change passwords here */
+const KEY='campusStore1';
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const inr=n=>'₹'+(Math.round(n*100)/100).toLocaleString('en-IN');
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+const nm=s=>String(s??'').trim().toLowerCase();
+const sum=(a,f)=>a.reduce((x,y)=>x+f(y),0);
+const group=(a,k)=>{const m={};a.forEach(x=>(m[x[k]]=m[x[k]]||[]).push(x));return Object.entries(m).sort((x,y)=>y[0].localeCompare(x[0]))};
+const mig=d=>{d=d||{};d.items=d.items||[];d.orders=d.orders||[];d.purchases=d.purchases||[];
+d.items.forEach(i=>{if(!i.prices){i.prices=[{n:1,price:+i.price||0}];i.open=+i.qty||0}i.open=+i.open||0});
+d.orders.forEach(o=>{if(o.count==null){const i=d.items.find(x=>x.id==o.itemId);o.count=+o.qty||1;o.n=1;o.price=i?+i.price||0:0}});
+d.purchases.forEach(p=>{p.qty=parseFloat(p.qty)||0});return d};
+const ld=()=>{try{return mig(JSON.parse(localStorage.getItem(KEY)))}catch(e){return mig({})}};
+const put=d=>{try{localStorage.setItem(KEY,JSON.stringify(d))}catch(e){alert('Storage full! Remove some photos.')}};
+const item=id=>S.items.find(i=>i.id==id);
+const bought=i=>i.open+sum(S.purchases.filter(p=>nm(p.item)==nm(i.name)),p=>p.qty);
+const used=i=>sum(S.orders.filter(o=>o.itemId==i.id&&o.status=='given'),o=>o.n*o.count);
+const reserved=i=>sum(S.orders.filter(o=>o.itemId==i.id&&o.status!='given'),o=>o.n*o.count);
+const rem=i=>Math.round((bought(i)-used(i))*1000)/1000;
+const avail=i=>Math.round((rem(i)-reserved(i))*1000)/1000;
+const amt=o=>o.price*o.count;
+const otxt=o=>{const i=item(o.itemId)||{name:'?'};return esc(i.name)+(o.n!=1?` (${o.n} for ${inr(o.price)})`:'')+' × '+o.count};
+const custs=()=>[...new Set(S.orders.map(o=>o.customer))];
+function login(){PW=$('#pw').value.trim();role=PW==PWS.admin?'admin':PW==PWS.vendor?'vendor':'';if(!role)return loginView('Password is wrong');S=ld();tab=role=='admin'?'p':'o';render()}
+function loginView(m=''){$('#app').innerHTML=`<div class="lg c"><h2>TSQ STORE</h2><input id="pw" type="password" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" placeholder="Password" onkeydown="event.key=='Enter'&&login()"><button class="p" onclick="login()">Open</button><p style="color:var(--r)">${m}</p></div>`}
+function logout(){PW='';role='';loginView()}
+function save(){put(S);render()}
+function render(){
+const T=role=='admin'?[['p','Purchases'],['i','Items'],['o','Orders'],['a','Accounts']]:[['o','Orders'],['i','Items']];
+$('#app').innerHTML=`<header><div><b>TSQ STORE</b><div style="font-size:13px;opacity:.85">${role=='admin'?'Admin':'Vendors'}</div></div><button onclick="logout()">Log out</button></header><nav>${T.map(t=>`<button class="${tab==t[0]?'on':''}" onclick="tab='${t[0]}';render()">${t[1]}</button>`).join('')}</nav><main>${{p:vP,i:vI,o:role=='admin'?vOA:vOV,a:vA}[tab]()}</main>`}
+function hint(id,list){const v=nm($('#'+id).value),b=$('#'+id+'h');if(v.length<2){b.innerHTML='';return}
+HL[id]=[...new Set(list)].filter(x=>nm(x).includes(v)&&nm(x)!=v).slice(0,5);
+b.innerHTML=HL[id].map((x,i)=>`<button class="s" onclick="setv('${id}',${i})">${esc(x)}</button>`).join('')}
+function setv(id,i){$('#'+id).value=HL[id][i];$('#'+id+'h').innerHTML=''}
+/* Purchases */
+function vP(){const tot=sum(S.purchases,p=>p.amount),td=sum(S.purchases.filter(p=>p.date==today()),p=>p.amount);
+return `<div class="grid"><div class="c"><div class="mut">Today's spending</div><div class="big">${inr(td)}</div></div><div class="c"><div class="mut">Total spent</div><div class="big">${inr(tot)}</div></div></div>
+<div class="c"><input id="pd" type="date" value="${pdate}"><input id="pn" autocomplete="off" placeholder="Item name" oninput="hint('pn',S.items.map(i=>i.name))"><div class="chips" id="pnh"></div>
+<div class="grid" style="margin:6px 0"><button class="s" onclick="$('#pc').click()">📷 Camera</button><button class="s" onclick="$('#pg').click()">🖼 Gallery</button></div>
+<img id="pv" class="t" onclick="zoom(this.src)" ${photo?`src="${photo}"`:'hidden'}>
+<input id="pc" type="file" accept="image/*" capture="environment" hidden onchange="pick(event)"><input id="pg" type="file" accept="image/*" hidden onchange="pick(event)">
+<input id="pq" type="number" step="any" placeholder="Quantity bought (pieces, kg…)"><input id="pa" type="number" step="any" placeholder="Total amount paid (₹)"><button class="p" onclick="addP()">Add</button></div>
+${group(S.purchases,'date').map(([d,a])=>`<div class="day"><span>${d}</span><span>${inr(sum(a,p=>p.amount))}</span></div><div class="c">${a.map(p=>`<div class="row"><div>${esc(p.item)}<div class="mut">Qty: ${p.qty}</div></div><div>${inr(p.amount)} <button class="s d" onclick="delP('${p.id}')">✕</button></div></div>`).join('')}</div>`).join('')||'<p class="mut">Nothing added yet.</p>'}`}
+function pick(ev){const f=ev.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{const im=new Image();im.onload=()=>{const c=document.createElement('canvas'),s=Math.min(1,420/Math.max(im.width,im.height));c.width=im.width*s;c.height=im.height*s;c.getContext('2d').drawImage(im,0,0,c.width,c.height);photo=c.toDataURL('image/jpeg',.7);$('#pv').src=photo;$('#pv').hidden=false};im.src=r.result};r.readAsDataURL(f);ev.target.value=''}
+function addP(){const d=$('#pd').value,n=$('#pn').value.trim(),q=$('#pq').value,a=$('#pa').value;if(!d||!n||q===''||a==='')return alert('Enter name, quantity and amount');pdate=d;
+let it=S.items.find(i=>nm(i.name)==nm(n));if(!it){it={id:uid(),name:n,photo:'',open:0,prices:[]};S.items.push(it)}
+if(photo)it.photo=photo;photo='';S.purchases.push({id:uid(),date:d,item:it.name,qty:+q,amount:+a});save()}
+function delP(id){if(!confirm('Delete this?'))return;S.purchases=S.purchases.filter(p=>p.id!=id);save()}
+/* Items */
+function vI(){const adm=role=='admin';
+const f=!adm?'':!S.items.length?'<p class="mut">Add items from the Purchases tab first.</p>':`<div class="c"><div class="mut">Price per unit</div><select id="is">${S.items.map(i=>`<option value="${i.id}" ${i.id==eIt?'selected':''}>${esc(i.name)}</option>`).join('')}</select><input id="in" type="number" step="any" placeholder="For how many units? (1, 2, 3…)" value="${eN??''}"><input id="ip" type="number" step="any" placeholder="Price (₹)" value="${eP??''}"><button class="p" onclick="addT()">${eIt?'Save changes':'Save price'}</button>${eIt?'<button class="s" style="width:100%;margin-top:6px" onclick="eIt=eN=eP=null;render()">Cancel</button>':''}</div>`;
+return f+`<div class="c">${S.items.map(i=>`<div class="row" style="align-items:flex-start"><div style="display:flex;gap:10px"><img class="t" src="${i.photo||''}" alt="" onclick="zoom(this.src)"><div><b>${esc(i.name)}</b><div>In stock: <b style="color:${rem(i)>0?'var(--g)':'var(--r)'}">${rem(i)}</b> <span class="mut">(bought ${bought(i)}, given ${used(i)}${reserved(i)>0?', reserved '+reserved(i):''})</span></div><div>${i.prices.length?i.prices.map((p,k)=>`<span class="tag">${p.n} for ${inr(p.price)}${adm?` <i onclick="editT('${i.id}',${k})">✎</i><i class="d" onclick="delT('${i.id}',${k})">✕</i>`:''}</span>`).join(''):'<span class="mut">No price yet</span>'}</div></div></div>${adm?`<button class="s d" onclick="delI('${i.id}')">✕</button>`:''}</div>`).join('')||'<p class="mut">No items.</p>'}</div>`}
+function addT(){const it=item($('#is').value),n=+$('#in').value||1,p=$('#ip').value;if(!it||p==='')return alert('Enter the price');
+if(eIt&&eN!=null&&eN!=n)it.prices=it.prices.filter(x=>x.n!=eN);
+const ex=it.prices.find(x=>x.n==n);if(ex)ex.price=+p;else it.prices.push({n,price:+p});it.prices.sort((a,b)=>a.n-b.n);eIt=eN=eP=null;save()}
+function editT(id,k){const p=item(id).prices[k];eIt=id;eN=p.n;eP=p.price;render()}
+function delT(id,k){if(!confirm('Delete this price?'))return;item(id).prices.splice(k,1);save()}
+function delI(id){if(!confirm('Delete this item? Its orders will be deleted too'))return;S.items=S.items.filter(i=>i.id!=id);S.orders=S.orders.filter(o=>o.itemId!=id);save()}
+/* Orders - admin */
+function vOA(){const av=S.items.filter(i=>avail(i)>0&&i.prices.length),f=av[0];
+return `<div class="c"><input id="od" type="date" value="${today()}"><input id="oc" autocomplete="off" placeholder="Customer name" oninput="hint('oc',custs())"><div class="chips" id="och"></div>
+<select id="oi" onchange="fillT()">${av.map(i=>`<option value="${i.id}">${esc(i.name)} (Available ${avail(i)})</option>`).join('')||'<option value="">No items in stock</option>'}</select>
+<select id="ot">${f?f.prices.map((p,k)=>`<option value="${k}">${p.n} for ${inr(p.price)}</option>`).join(''):''}</select>
+<input id="oq" type="number" min="1" value="1" placeholder="Quantity"><button class="p" onclick="addO()">Add order</button></div>
+${group(S.orders,'date').map(([d,a])=>`<div class="day"><span>${d} · ${a.length} Orders</span><span>Received ${inr(sum(a,amt))}</span></div><div class="c">${a.map(o=>`<div class="row"><div><b>${esc(o.customer)}</b><div class="mut">${otxt(o)} = ${inr(amt(o))}</div></div><div><span class="b ${o.status=='given'?'gi':'pe'}">${o.status=='given'?'Given':'Pending'}</span> <button class="s d" onclick="delO('${o.id}')">✕</button></div></div>`).join('')}</div>`).join('')||'<p class="mut">No orders.</p>'}`}
+function fillT(){const i=item($('#oi').value);$('#ot').innerHTML=i?i.prices.map((p,k)=>`<option value="${k}">${p.n} for ${inr(p.price)}</option>`).join(''):''}
+function addO(){const c=$('#oc').value.trim(),i=item($('#oi').value),p=i&&i.prices[+$('#ot').value],q=Math.floor(+$('#oq').value),d=$('#od').value;
+if(!c||!p||!(q>0)||!d)return alert('Fill in everything');if(p.n*q>avail(i))return alert('Only '+avail(i)+' available');
+const ex=S.orders.find(o=>nm(o.customer)==nm(c));S.orders.push({id:uid(),date:d,customer:ex?ex.customer:c,itemId:i.id,n:p.n,price:p.price,count:q,status:'pending'});save()}
+function delO(id){if(!confirm('Delete this order?'))return;S.orders=S.orders.filter(o=>o.id!=id);save()}
+/* Orders - vendor */
+function vOV(){const G={};S.orders.filter(o=>o.status==vf).forEach(o=>{const k=nm(o.customer);(G[k]=G[k]||{k,name:o.customer,a:[]}).a.push(o)});
+const gs=Object.values(G).sort((x,y)=>x.k.localeCompare(y.k));gk=gs.map(g=>g.k);const np=S.orders.filter(o=>o.status!='given').length;
+return `<div class="grid" style="margin-bottom:12px"><button class="p" style="opacity:${vf=='pending'?1:.5}" onclick="vf='pending';render()">Pending (${np})</button><button class="p" style="opacity:${vf=='given'?1:.5}" onclick="vf='given';render()">Given</button></div>
+${gs.map((g,x)=>`<div class="c"><div class="row" style="border:0;cursor:pointer" onclick="tg(${x})"><b>${esc(g.name)}</b><span class="mut">${g.a.length} ${g.a.length>1?'items':'item'} ${op[g.k]?'▲':'▼'}</span></div>${op[g.k]?g.a.sort((p,q)=>p.date.localeCompare(q.date)).map(o=>{const i=item(o.itemId)||{};return `<div class="row"><div style="display:flex;gap:10px;align-items:center"><img class="t" src="${i.photo||''}" alt="" onclick="zoom(this.src)"><div>${otxt(o)}<div class="mut">${o.date}</div></div></div><button class="s" onclick="give('${o.id}','${vf=='pending'?'given':'pending'}')">${vf=='pending'?'Given ✓':'↩ Pending'}</button></div>`}).join('')+(vf=='pending'&&g.a.length>1?`<button class="p" onclick="giveAll(${x})">All given ✓</button>`:''):''}</div>`).join('')||'<p class="mut">Nothing here.</p>'}`}
+function tg(x){op[gk[x]]=!op[gk[x]];render()}
+function give(id,s){S=ld();S.orders.forEach(o=>{if(o.id==id)o.status=s});put(S);render()}
+function giveAll(x){S=ld();S.orders.forEach(o=>{if(nm(o.customer)==gk[x]&&o.status!='given')o.status='given'});put(S);render()}
+/* Accounts */
+function dayCard(d){const P=S.purchases.filter(p=>p.date==d),O=S.orders.filter(o=>o.date==d),open=!cl[d];
+return `<div class="c"><div class="row" style="border:0;cursor:pointer" onclick="tgd('${d}')"><b>${d}</b><span class="mut">${open?'▲':'▼'}</span></div>
+<div class="row"><b>Spent</b><b>${inr(sum(P,p=>p.amount))}</b></div>${open?P.map(p=>`<div class="row" style="padding:4px 0 4px 12px"><span>${esc(p.item)} <span class="mut">× ${p.qty}</span></span><span>${inr(p.amount)}</span></div>`).join(''):''}
+<div class="row"><b>Income</b><b>${inr(sum(O,amt))}</b></div>${open?O.map(o=>`<div class="row" style="padding:4px 0 4px 12px"><span>${esc(o.customer)} <span class="mut">· ${otxt(o)}</span></span><span>${inr(amt(o))}</span></div>`).join(''):''}</div>`}
+function tgd(d){cl[d]=!cl[d];render()}
+function zoom(s){if(!s||s.slice(0,5)!='data:')return;const d=document.createElement('div');d.style.cssText='position:fixed;inset:0;background:#000d;display:flex;align-items:center;justify-content:center;z-index:99';d.onclick=()=>d.remove();d.innerHTML='<img src="'+s+'" style="max-width:96%;max-height:90%;border-radius:10px">';document.body.appendChild(d)}
+function vA(){return vA0()+backupUI()}
+function vA0(){const sp=sum(S.purchases,p=>p.amount),inc=sum(S.orders,amt),ds=[...new Set([...S.purchases.map(p=>p.date),...S.orders.map(o=>o.date)])].sort().reverse();
+const it=S.items.map(i=>({i,s:sum(S.purchases.filter(p=>nm(p.item)==nm(i.name)),p=>p.amount)})),un=sp-sum(it,x=>x.s);
+return `<div class="grid"><div class="c"><div class="mut">Total spent</div><div class="big">${inr(sp)}</div></div><div class="c"><div class="mut">Total income</div><div class="big">${inr(inc)}</div></div></div><div class="c"><div class="mut">Profit / Loss</div><div class="big" style="color:${inc-sp>=0?'var(--g)':'var(--r)'}">${inr(inc-sp)}</div></div>
+<div class="day"><span>By day</span></div>${ds.map(dayCard).join('')}
+<div class="day"><span>By item</span></div><div class="c tw"><table><tr><th>Item</th><th>Bought</th><th>Given</th><th>Left</th><th>Spent</th><th>Income</th></tr>${it.map(({i,s})=>`<tr><td>${esc(i.name)}</td><td>${bought(i)}</td><td>${used(i)}</td><td>${rem(i)}</td><td>${inr(s)}</td><td>${inr(sum(S.orders.filter(o=>o.itemId==i.id),amt))}</td></tr>`).join('')}${un>0?`<tr><td>Other</td><td></td><td></td><td></td><td>${inr(un)}</td><td></td></tr>`:''}</table></div>`}
+function backupUI(){return `<div class="day"><span>Backup</span></div><div class="c"><button class="p" onclick="bk()">Create backup</button><textarea id="bt" rows="4" style="width:100%;margin-top:8px" placeholder="Backup appears here / paste here to restore"></textarea><button class="p" style="background:var(--r)" onclick="rs()">Restore</button></div>`}
+function bk(){const t=JSON.stringify(ld());$('#bt').value=t;$('#bt').select();try{navigator.clipboard.writeText(t).then(()=>alert('Copied. Paste it into Notes/Keep to keep it safe'),()=>alert('Copy all the text in the box'))}catch(e){alert('Copy all the text in the box')}}
+function rs(){try{const d=JSON.parse($('#bt').value);if(!d.items||!d.orders||!d.purchases)throw 0;if(!confirm('Replace current data with this?'))return;S=mig(d);put(S);render()}catch(e){alert('Invalid backup')}}
+loginView();
+</script></body></html>
